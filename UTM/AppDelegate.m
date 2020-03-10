@@ -16,17 +16,44 @@
 
 #import "AppDelegate.h"
 
+typedef struct __SecTask *SecTaskRef;
+CFTypeRef SecTaskCopyValueForEntitlement(SecTaskRef task, CFStringRef entitlement, CFErrorRef  _Nullable *error);
+SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator);
+
 @interface AppDelegate ()
 
 @end
 
 @implementation AppDelegate
 
+- (void)checkEntitlements {
+    SecTaskRef task = SecTaskCreateFromSelf(NULL);
+    if (task == NULL) {
+        return;
+    }
+    CFTypeRef val = SecTaskCopyValueForEntitlement(task, CFSTR("get-task-allow"), NULL);
+    CFRelease(task);
+    if (val != NULL) { // we have the entitlement
+        CFRelease(val);
+        return;
+    }
+    
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Invalid Entitlements", @"AppDelegate") message:NSLocalizedString(@"Missing get-task-allow entitlement. This app is either improperly signed or signed with the wrong kind of certificate. You cannot start any VM until this is fixed.", @"AppDelegate") preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertAction *okay = [UIAlertAction actionWithTitle:NSLocalizedString(@"OK", @"OK button") style:UIAlertActionStyleDefault handler:nil];
+    [alert addAction:okay];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.window.rootViewController presentViewController:alert animated:YES completion:nil];
+    });
+}
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
     // trigger "allow network usage" popup in some regions
     [[NSURLSession.sharedSession dataTaskWithURL:[NSURL URLWithString:@"http://captive.apple.com"]] resume];
+    // Check the entitlements to make sure the app is properly signed
+#if !TARGET_OS_SIMULATOR
+    [self checkEntitlements];
+#endif
     return YES;
 }
 
